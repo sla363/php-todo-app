@@ -2,7 +2,7 @@
 
 namespace TodoApp\Controller;
 
-class MainController
+class MainController extends Controller
 {
     public const array ROUTES = [
         '/'     => 'showMain',
@@ -11,7 +11,11 @@ class MainController
 
     public function showMain(): void
     {
-        echo 'hello there!';
+       self::render('../templates/main.html.sla', [
+           'my_name' => 'John',
+           'my_surname' => 'Doe',
+           'time' => (new \DateTime())->format('Y-m-d H:i:s'),
+       ]);
     }
 
     public function showAsdf(): void
