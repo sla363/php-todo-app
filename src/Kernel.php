@@ -13,6 +13,9 @@ class Kernel
         $this->requestUri = $_SERVER['REQUEST_URI'];
     }
 
+    /**
+     * @throws \Exception
+     */
     public function run(): void
     {
         try {
