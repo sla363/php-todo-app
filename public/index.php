@@ -22,9 +22,17 @@ function main(): void
     }
 }
 
+/**
+ * @return array<string, string>
+ * @throws Exception
+ */
 function createRouteList(string $path): array
 {
     $filesAndFolders = glob($path);
+    if ($filesAndFolders === false) {
+        throw new Exception('Could not open file: '.$path);
+    }
+
     $routes = [];
 
     foreach ($filesAndFolders as $filesAndFolder) {
@@ -40,6 +48,7 @@ function createRouteList(string $path): array
 }
 
 /**
+ * @return array<string, string>
  * @throws Exception
  */
 function scanFileForRoutes(string $className, string $fileName): array
@@ -55,24 +64,29 @@ function scanFileForRoutes(string $className, string $fileName): array
 }
 
 /**
+ * @return array<string, string>
  * @throws Exception
  */
 function getRoutesFromClass(string $classNameWithNameSpace): array
 {
-    $routes = [];
-
-    try {
-        $reflection = new ReflectionClass($classNameWithNameSpace);
-    } catch (ReflectionException) {
+    if (class_exists($classNameWithNameSpace) === false) {
         return [];
     }
 
+    $reflection = new ReflectionClass($classNameWithNameSpace);
+
+    $routes = [];
     $routesConstant = $reflection->getConstant('ROUTES');
-    if ($routesConstant) {
+    if ($routesConstant && is_iterable($routesConstant)) {
         foreach ($routesConstant as $name => $value) {
+            if (is_string($name) === false || is_string($value) === false) {
+                throw new Exception('Route data should be of type <string, string>');
+            }
+
             if ($reflection->hasMethod($value) === false) {
                 throw new Exception('Method '.$classNameWithNameSpace.'::'.$value.' does not exist');
             }
+
             $routes[$name] = $classNameWithNameSpace.'::'.$value;
         }
     }
@@ -80,12 +94,19 @@ function getRoutesFromClass(string $classNameWithNameSpace): array
     return $routes;
 }
 
+/**
+ * @throws Exception
+ */
 function getNameSpace(string $fileName): string
 {
     $classNameWithNameSpace = '';
     $handle = fopen($fileName, 'r');
 
-    while ($handle !== false && ($line = fgets($handle)) !== false) {
+    if ($handle === false) {
+        throw new Exception('Cannot open file: '.$fileName);
+    }
+
+    while (($line = fgets($handle)) !== false) {
         $line = trim($line);
         $matches = [];
         preg_match_all('/^namespace(.*);$/', $line, $matches);
