@@ -7,9 +7,16 @@ namespace TodoApp;
 class Kernel
 {
     private string $requestUri;
+    private array $config;
 
     public function __construct()
     {
+        try {
+            $this->config = self::initConfig(__DIR__.'/../src/'.'*');
+        } catch (\Exception $e) {
+            throw new \Exception($e->getMessage());
+        }
+//        dd($this->routes);
         $this->requestUri = $_SERVER['REQUEST_URI'];
     }
 
@@ -18,13 +25,8 @@ class Kernel
      */
     public function run(): void
     {
-        try {
-            $routes = self::createRouteList(__DIR__.'/../src/'.'*');
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
-        }
-        if (array_key_exists($this->requestUri, $routes)) {
-            self::executeRoute($routes[$this->requestUri]);
+        if (array_key_exists($this->requestUri, $this->config['routes'])) {
+            self::executeRoute($this->config['routes'][$this->requestUri]);
         }
     }
 
@@ -32,42 +34,46 @@ class Kernel
      * @return array<string, string>
      * @throws \Exception
      */
-    private static function createRouteList(string $path): array
+    private static function initConfig(string $path): array
     {
         $filesAndFolders = glob($path);
         if ($filesAndFolders === false) {
             throw new \Exception('Could not open file: '.$path);
         }
 
-        $routes = [];
+        $config = [];
 
         foreach ($filesAndFolders as $filesAndFolder) {
             if (is_dir($filesAndFolder)) {
-                $result = self::createRouteList($filesAndFolder.'/*');
-                $routes = array_merge($routes, $result);
+                $result = self::initConfig($filesAndFolder.'/*');
+                foreach ($result as $key => $value) {
+                    $config[$key] = array_merge($config[$key] ?? [], $value);
+                }
             } elseif (preg_match_all('/^.*\/(.*)\.php$/', $filesAndFolder, $matches) && isset($matches[1][0])) {
-                $result = self::scanFileForRoutes($matches[1][0], $filesAndFolder);
-                $routes = array_merge($routes, $result);
+                $result = self::scanFile($matches[1][0], $filesAndFolder);
+                foreach ($result as $key => $value) {
+                    $config[$key] = array_merge($config[$key] ?? [], $value);
+                }
             }
         }
 
-        return $routes;
+        return $config;
     }
 
     /**
      * @return array<string, string>
      * @throws \Exception
      */
-    private static function scanFileForRoutes(string $className, string $fileName): array
+    private static function scanFile(string $className, string $fileName): array
     {
-        $routes = [];
+        $result = [];
 
         $classNameWithNameSpace = self::getNameSpace($fileName).'\\'.$className;
         if ($classNameWithNameSpace !== '') {
-            $routes = self::getRoutesFromClass($classNameWithNameSpace);
+            $result['routes'] = self::getRoutesFromClass($classNameWithNameSpace);
         }
 
-        return $routes;
+        return $result;
     }
 
     /**
