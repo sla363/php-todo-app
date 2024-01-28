@@ -8,7 +8,7 @@ class Kernel
 {
     private string $requestUri;
 
-    /** @var array<string, array<string, string>> */
+    /** @var array<string, array<int|string, array<string, array<int, mixed>|string>|string>> */
     private array $config;
 
     public function __construct()
@@ -26,13 +26,19 @@ class Kernel
      */
     public function run(): void
     {
-        if (array_key_exists($this->requestUri, $this->config['routes'])) {
-            self::executeRoute($this->config['routes'][$this->requestUri]);
+        $name = $this->config['routes'][$this->requestUri]['name'] ?? null;
+        $params = $this->config['routes'][$this->requestUri]['params'] ?? null;
+
+        if ($params !== null && is_string($name)) {
+            /** @var array<int, string> $params */
+            self::executeRoute($name, $params);
+        } elseif (is_string($name)) {
+            self::executeRoute($name);
         }
     }
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array<string, array<int|string, array<string, array<int, mixed>|string>|string>>
      * @throws \Exception
      */
     private static function initConfig(string $path): array
@@ -62,7 +68,7 @@ class Kernel
     }
 
     /**
-     * @return array<string, array<string, string>>
+     * @return array<string, array<int|string, array<string, array<int, mixed>|string>|class-string>>
      * @throws \Exception
      */
     private static function scanFile(string $className, string $fileName): array
@@ -71,25 +77,25 @@ class Kernel
 
         $classNameWithNameSpace = self::getNameSpace($fileName).'\\'.$className;
         if ($classNameWithNameSpace !== '') {
-            $result['routes'] = self::getRoutesFromClass($classNameWithNameSpace);
+            $result = self::getDataFromClass($classNameWithNameSpace);
         }
 
         return $result;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array<int|string, array<string, array<int,mixed>|string>|class-string>>
      * @throws \Exception
      */
-    private static function getRoutesFromClass(string $classNameWithNameSpace): array
+    private static function getDataFromClass(string $classNameWithNameSpace): array
     {
         if (class_exists($classNameWithNameSpace) === false) {
             return [];
         }
 
         $reflection = new \ReflectionClass($classNameWithNameSpace);
+        $result = [];
 
-        $routes = [];
         $routesConstant = $reflection->getConstant('ROUTES');
         if ($routesConstant && is_iterable($routesConstant)) {
             foreach ($routesConstant as $name => $value) {
@@ -101,11 +107,39 @@ class Kernel
                     throw new \Exception('Method '.$classNameWithNameSpace.'::'.$value.' does not exist');
                 }
 
-                $routes[$name] = $classNameWithNameSpace.'::'.$value;
+                $result['routes'][$name] = ['name' => $classNameWithNameSpace.'::'.$value];
+                $reflectionMethod = $reflection->getMethod($value);
+                if (!empty($reflectionParameters = $reflectionMethod->getParameters())) {
+                    foreach ($reflectionParameters as $reflectionParameter) {
+                        if (($reflectionParameterType = $reflectionParameter->getType(
+                            )) instanceof \ReflectionNamedType) {
+                            $result['routes'][$name]['params'][] = $reflectionParameterType->getName();
+                        }
+                    }
+                }
             }
         }
 
-        return $routes;
+
+        $reflectionParentClass = $reflection->getParentClass();
+        if ($reflectionParentClass instanceof \ReflectionClass) {
+            try {
+                $getInstanceMethod = $reflectionParentClass->getMethod('getInstance');
+                $getInstanceMethodReturnType = $getInstanceMethod->getReturnType();
+            } catch (\Exception|\Error) {
+                $getInstanceMethod = null;
+                $getInstanceMethodReturnType = null;
+            }
+
+            if ($getInstanceMethod instanceof \ReflectionMethod && $getInstanceMethod->isPublic(
+                ) && $getInstanceMethod->isStatic(
+                ) && $getInstanceMethodReturnType instanceof \ReflectionNamedType && $getInstanceMethodReturnType->getName(
+                )) {
+                $result['services'] = [$classNameWithNameSpace];
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -134,11 +168,23 @@ class Kernel
         return $classNameWithNameSpace;
     }
 
-    private static function executeRoute(string $route): void
+    /**
+     * @param array<int, string>|null $params
+     */
+    private static function executeRoute(string $route, array $params = null): void
     {
         [$className, $methodName] = explode('::', $route);
         $controllerObject = new $className();
-        if (method_exists($controllerObject, $methodName)) {
+
+        if (method_exists($controllerObject, $methodName) && $params !== null) {
+            $serviceInstances = [];
+
+            foreach ($params as $param) {
+                $serviceInstances[] = $param::getInstance();
+            }
+
+            $controllerObject->$methodName(...$serviceInstances);
+        } elseif (method_exists($controllerObject, $methodName)) {
             $controllerObject->$methodName();
         }
     }
