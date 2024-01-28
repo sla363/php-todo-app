@@ -6,9 +6,9 @@ namespace TodoApp\Service;
 
 abstract class Manager
 {
-    private static Manager $instance;
+    protected static self $instance;
 
-    protected function __construct()
+    final protected function __construct()
     {
     }
 

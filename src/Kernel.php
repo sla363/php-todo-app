@@ -7,6 +7,8 @@ namespace TodoApp;
 class Kernel
 {
     private string $requestUri;
+
+    /** @var array<string, array<string, string>> */
     private array $config;
 
     public function __construct()
@@ -16,7 +18,6 @@ class Kernel
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         }
-//        dd($this->routes);
         $this->requestUri = $_SERVER['REQUEST_URI'];
     }
 
@@ -31,7 +32,7 @@ class Kernel
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array<string, string>>
      * @throws \Exception
      */
     private static function initConfig(string $path): array
@@ -61,7 +62,7 @@ class Kernel
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, array<string, string>>
      * @throws \Exception
      */
     private static function scanFile(string $className, string $fileName): array
