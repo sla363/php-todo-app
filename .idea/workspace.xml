@@ -5,8 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="511443f9-851f-4c4b-adf0-4cd644739c56" name="Changes" comment=".idea changes">
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,17 +34,7 @@
   <component name="PhpStanProjectConfiguration">
     <option name="selectedConfigurationId" value="e75b0912-2a1c-4c80-bba9-f3359a185f82" />
   </component>
-  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="Debian">
-    <include_path>
-      <path value="$PROJECT_DIR$/vendor/fakerphp/faker" />
-      <path value="$PROJECT_DIR$/vendor/composer" />
-      <path value="$PROJECT_DIR$/vendor/psr/container" />
-      <path value="$PROJECT_DIR$/vendor/symfony/deprecation-contracts" />
-      <path value="$PROJECT_DIR$/vendor/phpstan/phpstan" />
-      <path value="$PROJECT_DIR$/vendor/symfony/polyfill-mbstring" />
-      <path value="$PROJECT_DIR$/vendor/symfony/var-dumper" />
-    </include_path>
-  </component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="Debian" />
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
   </component>
@@ -115,7 +106,7 @@
       <workItem from="1705822268402" duration="1736000" />
       <workItem from="1705824524005" duration="75000" />
       <workItem from="1705824614690" duration="23868000" />
-      <workItem from="1706447817202" duration="9086000" />
+      <workItem from="1706447817202" duration="10366000" />
     </task>
     <task id="LOCAL-00001" summary="vcs change">
       <option name="closed" value="true" />
