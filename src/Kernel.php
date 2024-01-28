@@ -6,19 +6,26 @@ namespace TodoApp;
 
 class Kernel
 {
-    private string $requestUri;
+    private const string ROOT_APP_FOLDER = __DIR__.'/../src/';
 
-    /** @var array<string, array<int|string, array<string, array<int, mixed>|string>|string>> */
+    /** @var array<int, string> */
+    private const array ENV_VARIABLES = [
+        'DB_NAME',
+        'DB_USER',
+        'DB_PASSWORD',
+    ];
+    private string $routeName;
+
     private array $config;
 
     public function __construct()
     {
         try {
-            $this->config = self::initConfig(__DIR__.'/../src/'.'*');
+            $this->config = self::initConfig(self::ROOT_APP_FOLDER.'*');
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         }
-        $this->requestUri = $_SERVER['REQUEST_URI'];
+        $this->routeName = $_SERVER['REQUEST_URI'];
     }
 
     /**
@@ -26,38 +33,65 @@ class Kernel
      */
     public function run(): void
     {
-        $name = $this->config['routes'][$this->requestUri]['name'] ?? null;
-        $params = $this->config['routes'][$this->requestUri]['params'] ?? null;
+        $routeExists = isset($this->config['routes'][$this->routeName]);
 
-        if ($params !== null && is_string($name)) {
-            /** @var array<int, string> $params */
-            self::executeRoute($name, $params);
-        } elseif (is_string($name)) {
-            self::executeRoute($name);
+        if ($routeExists === true) {
+            $this->executeRoute($this->routeName);
         }
     }
 
     /**
-     * @return array<string, array<int|string, array<string, array<int, mixed>|string>|string>>
      * @throws \Exception
      */
     private static function initConfig(string $path): array
     {
+        $config = [];
+
+        if (file_exists($envFile = self::ROOT_APP_FOLDER.'../.env') &&
+            ($handle = fopen($envFile, 'r')) !== false) {
+            while (($line = fgets($handle)) !== false) {
+                preg_match('/^(.*)=(.*)$/', $line, $matches);
+                $envVariableName = isset($matches[1]) ? trim($matches[1]) : null;
+                $envVariableValue = isset($matches[2]) ? trim($matches[2]) : null;
+
+                if ($envVariableName !== null && $envVariableValue !== null
+                    && in_array($envVariableName, self::ENV_VARIABLES)) {
+                    $config['env'][$envVariableName] = $envVariableValue;
+                }
+            }
+
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+
+        $envData = $config['env'] ?? null;
+
+        $filesAndFoldersConfig = self::scanFilesAndFolders($path, $envData);
+
+        return array_merge($config, $filesAndFoldersConfig);
+    }
+
+    /**
+     * @throws \Exception
+     */
+    private static function scanFilesAndFolders(string $path, array $envData = null): array
+    {
+        $config = [];
+
         $filesAndFolders = glob($path);
         if ($filesAndFolders === false) {
             throw new \Exception('Could not open file: '.$path);
         }
 
-        $config = [];
-
         foreach ($filesAndFolders as $filesAndFolder) {
             if (is_dir($filesAndFolder)) {
-                $result = self::initConfig($filesAndFolder.'/*');
+                $result = self::scanFilesAndFolders($filesAndFolder.'/*', $envData);
                 foreach ($result as $key => $value) {
                     $config[$key] = array_merge($config[$key] ?? [], $value);
                 }
             } elseif (preg_match_all('/^.*\/(.*)\.php$/', $filesAndFolder, $matches) && isset($matches[1][0])) {
-                $result = self::scanFile($matches[1][0], $filesAndFolder);
+                $result = self::scanFile($matches[1][0], $filesAndFolder, $envData);
                 foreach ($result as $key => $value) {
                     $config[$key] = array_merge($config[$key] ?? [], $value);
                 }
@@ -68,47 +102,45 @@ class Kernel
     }
 
     /**
-     * @return array<string, array<int|string, array<string, array<int, mixed>|string>|class-string>>
      * @throws \Exception
      */
-    private static function scanFile(string $className, string $fileName): array
+    private static function scanFile(string $className, string $fileName, array $envData = null): array
     {
         $result = [];
 
         $classNameWithNameSpace = self::getNameSpace($fileName).'\\'.$className;
         if ($classNameWithNameSpace !== '') {
-            $result = self::getDataFromClass($classNameWithNameSpace);
+            $result = self::getDataFromClass($classNameWithNameSpace, $envData);
         }
 
         return $result;
     }
 
     /**
-     * @return array<string, array<int|string, array<string, array<int,mixed>|string>|class-string>>
      * @throws \Exception
      */
-    private static function getDataFromClass(string $classNameWithNameSpace): array
+    private static function getDataFromClass(string $classNameWithNameSpace, array $envData = null): array
     {
         if (class_exists($classNameWithNameSpace) === false) {
             return [];
         }
 
-        $reflection = new \ReflectionClass($classNameWithNameSpace);
+        $reflectionClass = new \ReflectionClass($classNameWithNameSpace);
         $result = [];
 
-        $routesConstant = $reflection->getConstant('ROUTES');
-        if ($routesConstant && is_iterable($routesConstant)) {
+        $routesConstant = $reflectionClass->getConstant('ROUTES');
+        if (is_iterable($routesConstant)) {
             foreach ($routesConstant as $name => $value) {
                 if (is_string($name) === false || is_string($value) === false) {
                     throw new \Exception('Route data should be of type <string, string>');
                 }
 
-                if ($reflection->hasMethod($value) === false) {
+                if ($reflectionClass->hasMethod($value) === false) {
                     throw new \Exception('Method '.$classNameWithNameSpace.'::'.$value.' does not exist');
                 }
 
                 $result['routes'][$name] = ['name' => $classNameWithNameSpace.'::'.$value];
-                $reflectionMethod = $reflection->getMethod($value);
+                $reflectionMethod = $reflectionClass->getMethod($value);
                 if (!empty($reflectionParameters = $reflectionMethod->getParameters())) {
                     foreach ($reflectionParameters as $reflectionParameter) {
                         if (($reflectionParameterType = $reflectionParameter->getType(
@@ -120,8 +152,7 @@ class Kernel
             }
         }
 
-
-        $reflectionParentClass = $reflection->getParentClass();
+        $reflectionParentClass = $reflectionClass->getParentClass();
         if ($reflectionParentClass instanceof \ReflectionClass) {
             try {
                 $getInstanceMethod = $reflectionParentClass->getMethod('getInstance');
@@ -135,7 +166,16 @@ class Kernel
                 ) && $getInstanceMethod->isStatic(
                 ) && $getInstanceMethodReturnType instanceof \ReflectionNamedType && $getInstanceMethodReturnType->getName(
                 )) {
-                $result['services'] = [$classNameWithNameSpace];
+                $result['services'] = [$classNameWithNameSpace => ['name' => $classNameWithNameSpace]];
+
+                $requiredEnvVariablesConstant = $reflectionClass->getConstant('REQUIRED_ENV_VARIABLES');
+                if (is_iterable($requiredEnvVariablesConstant)) {
+                    foreach ($requiredEnvVariablesConstant as $item) {
+                        if (isset($envData[$item])) {
+                            $result['services'][$classNameWithNameSpace]['params'][$item] = $envData[$item];
+                        }
+                    }
+                }
             }
         }
 
@@ -156,31 +196,41 @@ class Kernel
 
         while (($line = fgets($handle)) !== false) {
             $line = trim($line);
-            $matches = [];
             preg_match_all('/^namespace(.*);$/', $line, $matches);
-            if (!empty($matches[1][0])) {
-                $classNameWithNameSpace = trim($matches[1][0]);
+            $classNameWithNameSpace = isset($matches[1][0]) ? trim($matches[1][0]) : '';
+            if ($classNameWithNameSpace !== '') {
                 break;
             }
         }
-        fclose($handle);
+
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
 
         return $classNameWithNameSpace;
     }
 
-    /**
-     * @param array<int, string>|null $params
-     */
-    private static function executeRoute(string $route, array $params = null): void
+    private function executeRoute(string $route): void
     {
-        [$className, $methodName] = explode('::', $route);
+        $routeClassName = $this->config['routes'][$route]['name'];
+        [$className, $methodName] = explode('::', $routeClassName);
+        $routeParams = $this->config['routes'][$route]['params'] ?? null;
         $controllerObject = new $className();
 
-        if (method_exists($controllerObject, $methodName) && $params !== null) {
+        if (method_exists($controllerObject, $methodName) && $routeParams !== null) {
             $serviceInstances = [];
+            foreach ($routeParams as $routeParam) {
+                $serviceInstance = $routeParam::getInstance();
+                if (isset($this->config['services'][$routeParam]['params'])) {
+                    $serviceParams = $this->config['services'][$routeParam]['params'];
+                    $serviceParamsWithoutIndexes = [];
 
-            foreach ($params as $param) {
-                $serviceInstances[] = $param::getInstance();
+                    foreach ($serviceParams as $serviceParam) {
+                        $serviceParamsWithoutIndexes[] = $serviceParam;
+                    }
+                    $serviceInstance->init(... $serviceParamsWithoutIndexes);
+                }
+                $serviceInstances[] = $serviceInstance;
             }
 
             $controllerObject->$methodName(...$serviceInstances);
@@ -188,5 +238,4 @@ class Kernel
             $controllerObject->$methodName();
         }
     }
-
 }

@@ -6,6 +6,10 @@ namespace TodoApp\Controller;
 
 abstract class Controller
 {
+    final public function __construct()
+    {
+    }
+
     /**
      * @param array<string, string> $options
      * @throws \Exception
