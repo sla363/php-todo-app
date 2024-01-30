@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TodoApp;
 
+use TodoApp\Attribute\Route;
+
 class Kernel
 {
     private const string ROOT_APP_FOLDER = __DIR__.'/../src/';
@@ -128,24 +130,20 @@ class Kernel
         $reflectionClass = new \ReflectionClass($classNameWithNameSpace);
         $result = [];
 
-        $routesConstant = $reflectionClass->getConstant('ROUTES');
-        if (is_iterable($routesConstant)) {
-            foreach ($routesConstant as $name => $value) {
-                if (is_string($name) === false || is_string($value) === false) {
-                    throw new \Exception('Route data should be of type <string, string>');
-                }
+        foreach ($reflectionClass->getMethods() as $method) {
+            $routeAttributes = $method->getAttributes(Route::class);
 
-                if ($reflectionClass->hasMethod($value) === false) {
-                    throw new \Exception('Method '.$classNameWithNameSpace.'::'.$value.' does not exist');
-                }
-
-                $result['routes'][$name] = ['name' => $classNameWithNameSpace.'::'.$value];
-                $reflectionMethod = $reflectionClass->getMethod($value);
-                if (!empty($reflectionParameters = $reflectionMethod->getParameters())) {
+            foreach ($routeAttributes as $routeAttribute) {
+                $routeAttributeInstance = $routeAttribute->newInstance();
+                $routeName = $routeAttributeInstance->name;
+                $result['routes'][$routeName] = [
+                    'name' => $classNameWithNameSpace.'::'.$method->getName(),
+                ];
+                if (!empty($reflectionParameters = $method->getParameters())) {
                     foreach ($reflectionParameters as $reflectionParameter) {
                         if (($reflectionParameterType = $reflectionParameter->getType(
                             )) instanceof \ReflectionNamedType) {
-                            $result['routes'][$name]['params'][] = $reflectionParameterType->getName();
+                            $result['routes'][$routeName]['params'][] = $reflectionParameterType->getName();
                         }
                     }
                 }

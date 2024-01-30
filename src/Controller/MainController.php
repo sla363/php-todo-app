@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace TodoApp\Controller;
 
+use TodoApp\Attribute\Route;
+
 class MainController extends Controller
 {
-    /**
-     * @var array<string, string>
-     */
-    public const array ROUTES = [
-        '/'     => 'showMain',
-        '/asdf' => 'showAsdf',
-    ];
-
+    #[Route('/')]
     public function showMain(): void
     {
         self::render('../templates/main.html.sla', [
@@ -23,6 +18,7 @@ class MainController extends Controller
         ]);
     }
 
+    #[Route('/asdf')]
     public function showAsdf(): void
     {
         echo 'hello asdf!';
