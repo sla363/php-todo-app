@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TodoApp;
 
+use TodoApp\Attribute\Env;
 use TodoApp\Attribute\Route;
 
 class Kernel
@@ -166,11 +167,12 @@ class Kernel
                 )) {
                 $result['services'] = [$classNameWithNameSpace => ['name' => $classNameWithNameSpace]];
 
-                $requiredEnvVariablesConstant = $reflectionClass->getConstant('REQUIRED_ENV_VARIABLES');
-                if (is_iterable($requiredEnvVariablesConstant)) {
-                    foreach ($requiredEnvVariablesConstant as $item) {
-                        if (isset($envData[$item])) {
-                            $result['services'][$classNameWithNameSpace]['params'][$item] = $envData[$item];
+                $envAttributeReflection = $reflectionClass->getAttributes(Env::class);
+                if (!empty($envAttributeReflection[array_key_first($envAttributeReflection)])) {
+                    $envAttribute = $envAttributeReflection[array_key_first($envAttributeReflection)]->newInstance();
+                    foreach ($envAttribute->variables as $variable) {
+                        if (isset($envData[$variable])) {
+                            $result['services'][$classNameWithNameSpace]['params'][$variable] = $envData[$variable];
                         }
                     }
                 }
