@@ -11,12 +11,6 @@ class Kernel
 {
     private const string ROOT_APP_FOLDER = __DIR__.'/../src/';
 
-    /** @var array<int, string> */
-    private const array ENV_VARIABLES = [
-        'DB_NAME',
-        'DB_USER',
-        'DB_PASSWORD',
-    ];
     private string $routeName;
 
     private array $config;
@@ -57,8 +51,7 @@ class Kernel
                 $envVariableName = isset($matches[1]) ? trim($matches[1]) : null;
                 $envVariableValue = isset($matches[2]) ? trim($matches[2]) : null;
 
-                if ($envVariableName !== null && $envVariableValue !== null
-                    && in_array($envVariableName, self::ENV_VARIABLES)) {
+                if ($envVariableName !== null && $envVariableValue !== null) {
                     $config['env'][$envVariableName] = $envVariableValue;
                 }
             }
